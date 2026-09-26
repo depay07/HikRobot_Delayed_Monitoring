@@ -74,7 +74,7 @@
     <Compile Include="CameraLayout.cs" />
     <Compile Include="MonitorHeader.cs" />
     <Compile Include="InspectionBuffer.cs" />
-    <Compile Include="InspectionSession.cs" />
+    <Compile Include="FolderImageSource.cs" />
     <Compile Include="DelayedPane.cs" />
     <Compile Include="MonitorLog.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

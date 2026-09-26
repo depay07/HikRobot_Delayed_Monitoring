@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -50,7 +50,7 @@ namespace SC6000DelayedMonitor
                 CameraSettings camera = config.GetCamera(i + 1);
                 var panel = new Panel { Dock = DockStyle.Fill, Margin = new Padding(1), BackColor = Color.FromArgb(45, 52, 56) };
                 var status = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = Color.White,
-                    Text = camera.Title + "\r\n" + camera.Ip + "\r\n연결 준비 중...", Font = new Font("Segoe UI", 12) };
+                    Text = camera.Title + "\r\n" + camera.ImageFolder + "\r\n이미지 수신 준비 중...", Font = new Font("Segoe UI", 12) };
                 panel.Controls.Add(status);
                 Point cell = policy.Cell(i);
                 grid.Controls.Add(panel, cell.X, cell.Y);

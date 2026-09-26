@@ -1,103 +1,89 @@
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
-using System.Reflection;
-using System.Windows.Forms;
 using SC6000DelayedMonitor;
-
 internal static class BufferTests
 {
-    static void Check(bool value, string why) { if (!value) throw new Exception(why); }
-    static InspectionResult Result(int sequence)
+    static void Check(bool ok, string why) { if(!ok) throw new Exception(why); }
+    static readonly DateTime Epoch = new DateTime(2026,9,26,0,0,0,DateTimeKind.Utc);
+    static byte[] Bytes(int n)
     {
-        using (var borrowed = new Bitmap(12, 8))
-        {
-            borrowed.SetPixel(0, 0, Color.FromArgb(sequence % 255, 20, 30));
-            return new InspectionResult(sequence, new Bitmap(borrowed), sequence % 2 == 0);
-        }
+        using(var image=new Bitmap(24,16)) using(var stream=new MemoryStream())
+        { image.SetPixel(0,0,Color.FromArgb(n%255,20,30)); image.Save(stream,ImageFormat.Png); return stream.ToArray(); }
     }
+    static void Save(string path, int n)
+    { Directory.CreateDirectory(Path.GetDirectoryName(path)); File.WriteAllBytes(path,Bytes(n)); File.SetLastWriteTimeUtc(path,Epoch.AddSeconds(n)); }
+    static InspectionResult Read(FolderImageSource source) { string status; return source.Take(out status); }
     [STAThread] static void Main()
     {
         try
         {
-            foreach (int delay in new[] { 0, 1, 14 })
+            string root=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"ftp-"+Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            foreach(int delay in new[]{0,1,14})
             {
-                using (var queue = new InspectionBuffer(delay))
+                string dir=Path.Combine(root,"delay"+delay); Directory.CreateDirectory(dir);
+                Save(Path.Combine(dir,"old.png"),0);
+                using(var source=new FolderImageSource(dir,delay))
                 {
-                    for (int current = 1; current <= 1000; current++)
+                    source.Scan(); Check(Read(source)==null,"Old file counted");
+                    for(int n=1;n<=40;n++)
                     {
-                        queue.Push(Result(current));
-                        Check(queue.Count == Math.Min(current, delay), "Queue size");
-                        using (var shown = queue.Take())
+                        // Switch date folders without restarting or resetting the count.
+                        Save(Path.Combine(dir,n<20?"2026/09/26":"2026/09/27",n.ToString()+".png"),n);
+                        source.Scan(); source.Scan();
+                        using(var shown=Read(source))
                         {
-                            if (current <= delay) Check(shown == null, "Premature display");
-                            else
-                            {
-                                Check(shown != null && shown.SequenceNo == current - delay, "Off-by-one");
-                                Check(shown.IsOK == ((current - delay) % 2 == 0), "Result/image mismatch");
-                                Check(shown.Image.GetPixel(0, 0).R == (current - delay) % 255, "Image changed after source dispose");
-                            }
+                            if(n<=delay) Check(shown==null,"Warmup off by one");
+                            else { Check(shown!=null && shown.SequenceNo==n-delay,"Delay sequence"); Check(shown.Image.GetPixel(0,0).R==(n-delay)%255,"Wrong saved image"); }
                         }
+                        source.Scan(); Check(Read(source)==null,"Counted same file twice");
                     }
                 }
-                Console.WriteLine("PASS delay=" + delay + ": 1000 inspections, exact sequence/result/image");
+                Console.WriteLine("PASS folder delay="+delay+": exact sequence, old files ignored, duplicate scans, date rollover");
             }
-            using (var queue = new InspectionBuffer(14))
+            string batch=Path.Combine(root,"batch"); Directory.CreateDirectory(batch);
+            using(var source=new FolderImageSource(batch,14))
             {
-                var all = new List<InspectionResult>();
-                // Do not consume UI updates: memory must remain delay+1, not 1000 images.
-                for (int i = 1; i <= 1000; i++) { var r = Result(i); all.Add(r); queue.Push(r); }
-                Check(queue.Count == 14, "Unbounded queue");
-                int retained = 0; foreach (var r in all) if (r.Image != null) retained++;
-                Check(retained == 15, "Pending UI snapshots accumulated");
-                using (var latest = queue.Take()) Check(latest.SequenceNo == 986, "UI coalescing changed delay");
-                queue.Reset();
-                foreach (var r in all) Check(r.Image == null, "Reset leaked image");
-                queue.Push(Result(1)); Check(queue.Take() == null, "Reset mixed sessions");
+                for(int n=15;n>=1;n--) Save(Path.Combine(batch,(100-n)+".png"),n);
+                source.Scan(); source.Scan();
+                using(var shown=Read(source)) Check(shown!=null && shown.Image.GetPixel(0,0).R==1,"Files not sorted by saved time");
             }
-            Console.WriteLine("PASS bounded UI backlog and reset/dispose ownership");
-            string dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            foreach (string input in new[] { "14", "0", "-1", "invalid", "2147483648", "" })
+            Console.WriteLine("PASS reverse creation/filename order sorted by last-write timestamp: 15 -> 1");
+            string partial=Path.Combine(root,"partial"); Directory.CreateDirectory(partial);
+            using(var source=new FolderImageSource(partial,1))
             {
-                string file = Path.Combine(dir, "config-test.ini");
-                File.WriteAllText(file, "CAMERAS=1\nDELAY_COUNT=" + input + "\n[CAMERA1]\nIP=192.0.2.10\n");
-                var config = IniConfig.Load(file);
-                Check(config.DelayCount == (input == "14" ? 14 : 0), "Config fallback " + input);
-                Check(config.GetCamera(1).DelayCount == config.DelayCount, "Camera delay propagation");
-            }
-            Console.WriteLine("PASS invalid/missing/negative DELAY_COUNT -> 0");
-            using (var pane = new DelayedPane("CAMERA 1", 14))
-            {
-                var r = Result(12345); pane.ShowResult(r);
-                pane.ShowStatus("Disconnected", true); Check(r.Image == null, "UI retained old session image");
-                var r2 = Result(12346); pane.ShowResult(r2); pane.Dispose();
-                Check(r2.Image == null, "UI dispose leak");
-            }
-            Console.WriteLine("PASS displayed image disposed on reset and close");
-            // Exercise resets with a real SDK singleton, but no remote connection or Run call.
-            VM.Core.VmSolution.SetControlMode(VM.Core.ControlModeType.REMOTE);
-            using (var dispatcher = new Form())
-            using (var pane = new DelayedPane("TEST", 14))
-            {
-                var handle = dispatcher.Handle;
-                using (var session = new InspectionSession(new CameraSettings { DelayCount = 14 }, dispatcher, pane))
+                string first=Path.Combine(partial,"first.png"); byte[] bytes=Bytes(1);
+                using(var writer=new FileStream(first,FileMode.Create,FileAccess.Write,FileShare.ReadWrite))
                 {
-                    var flags = BindingFlags.Instance | BindingFlags.NonPublic;
-                    var buffer = (InspectionBuffer)typeof(InspectionSession).GetField("_buffer", flags).GetValue(session);
-                    var held = Result(1); buffer.Push(held);
-                    var previous = Result(2); pane.ShowResult(previous);
-                    session.Reset("Disconnected");
-                    Application.DoEvents();
-                    Check(held.Image == null && previous.Image == null, "Session reset retained old images");
-                    Check(buffer.Count == 0, "Session queue not empty");
-                    session.Bind(); Application.DoEvents(); // Blank mapping must not try a guessed Procedure.
-                    Check(typeof(InspectionSession).GetField("_procedure", flags).GetValue(session) == null, "Guessed Procedure");
+                    writer.Write(bytes,0,bytes.Length/2); writer.Flush(); File.SetLastWriteTimeUtc(first,Epoch.AddSeconds(1));
+                    Save(Path.Combine(partial,"second.png"),2);
+                    source.Scan(); source.Scan(); Check(Read(source)==null,"Read partial image or overtook writer");
+                    writer.Write(bytes,bytes.Length/2,bytes.Length-bytes.Length/2);
                 }
-                Application.DoEvents(); // A queued drain after Dispose must safely do nothing.
+                File.SetLastWriteTimeUtc(first,Epoch.AddSeconds(1));
+                source.Scan(); source.Scan();
+                using(var shown=Read(source)) Check(shown!=null && shown.Image.GetPixel(0,0).R==1,"Partial upload recovery");
             }
-            Console.WriteLine("PASS session reset, stale UI work after dispose, and missing mapping");
+            Console.WriteLine("PASS incomplete/locked FTP upload retried in sequence");
+            string future=Path.Combine(root,"future");
+            using(var source=new FolderImageSource(future,0))
+            { source.Scan(); Save(Path.Combine(future,"2026/09/27/image.png"),3); source.Scan(); source.Scan(); using(var shown=Read(source)) Check(shown!=null,"New root/date directory missed"); }
+            using(var queue=new InspectionBuffer(14))
+            {
+                var all=new System.Collections.Generic.List<InspectionResult>();
+                for(int n=1;n<=1000;n++){var r=new InspectionResult(n,new Bitmap(2,2),n+".png");all.Add(r);queue.Push(r);}
+                int alive=0;foreach(var r in all) if(r.Image!=null) alive++;
+                Check(alive==15,"UI backlog memory unbounded");queue.Reset();foreach(var r in all) Check(r.Image==null,"Reset leak");
+            }
+            Console.WriteLine("PASS late folder creation and bounded/disposed image memory");
+            string ini=Path.Combine(root,"config.ini"); File.WriteAllText(ini,"CAMERAS=1\nDELAY_COUNT=14\nIMAGE_FOLDER=D:\\vision\n[CAMERA1]\nTITLE=검사\n");
+            var settings=IniConfig.Load(ini).GetCamera(1);Check(settings.ImageFolder==@"D:\vision"&&settings.DelayCount==14,"Simple folder config");
+            foreach(string invalid in new[]{"-1","bad","2147483648"})
+            { File.WriteAllText(ini,"DELAY_COUNT="+invalid);Check(IniConfig.Load(ini).DelayCount==0,"Invalid delay fallback"); }
+            Console.WriteLine("PASS folder-only config without camera IP or SDK output names");
         }
-        catch (Exception ex) { Console.Error.WriteLine(ex); Environment.ExitCode = 1; }
+        catch(Exception ex){Console.Error.WriteLine(ex);Environment.ExitCode=1;}
     }
 }

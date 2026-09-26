@@ -1,81 +1,75 @@
-using System;
-using System.Diagnostics;
+﻿using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows.Forms;
-using VM.Core;
-using VM.PlatformSDKCS;
-using VMControls.Winform.Release;
 
 namespace SC6000DelayedMonitor
 {
     internal sealed class ViewerForm : Form
     {
-        private const ushort VmRemotePort = 5556;
         private readonly CameraSettings _settings;
         private readonly IntPtr _parent;
-        private readonly Timer _layoutTimer = new Timer { Interval = 200 };
-        private VmFrontendControl _frontend;
-        private readonly Panel _live;
+        private readonly System.Windows.Forms.Timer _layoutTimer = new System.Windows.Forms.Timer { Interval = 200 };
         private readonly DelayedPane _delayed;
-        private InspectionSession _inspection;
-        private readonly Label _status;
-        private bool _frontendLoaded;
-        private bool _connected;
-        private bool _resizeQueued;
+        private readonly object _gate = new object();
+        private FolderImageSource _source;
+        private System.Threading.Timer _scanTimer;
+        private int _busy;
+        private bool _closed;
+        private string _error;
 
         public ViewerForm(CameraSettings settings, IntPtr parent)
         {
-            _settings = settings;
-            _parent = parent;
+            _settings = settings; _parent = parent;
             AutoScaleMode = AutoScaleMode.None;
-            Text = settings.Title;
-            TopLevel = false;
-            FormBorderStyle = FormBorderStyle.None;
-            ShowInTaskbar = false;
-            StartPosition = FormStartPosition.Manual;
+            Text = settings.Title; TopLevel = false; FormBorderStyle = FormBorderStyle.None;
+            ShowInTaskbar = false; StartPosition = FormStartPosition.Manual;
             BackColor = Color.FromArgb(45, 52, 56);
-            _status = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter,
-                ForeColor = Color.White, Font = new Font("Segoe UI", 12),
-                Text = settings.Title + "\r\n" + settings.Ip + "\r\n연결 중..." };
-            var split = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
-                Margin = Padding.Empty, Padding = Padding.Empty };
-            split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            split.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            _live = new Panel { Dock = DockStyle.Fill, Margin = new Padding(1) };
-            _live.Controls.Add(_status);
-            _live.Controls.Add(new Label { Dock = DockStyle.Top, Height = 24, ForeColor = Color.White, Text = "Operation Interface (Live)" });
-            var delayedHost = new Panel { Dock = DockStyle.Fill, Margin = new Padding(1) };
             _delayed = new DelayedPane(settings.Title, settings.DelayCount);
-            var retry = new Button { Dock = DockStyle.Bottom, Height = 32, AutoSize = true, Text = "결과 다시 연결",
-                BackColor = SystemColors.Control, ForeColor = SystemColors.ControlText, UseVisualStyleBackColor = true };
-            retry.Click += delegate { if (_connected && _inspection != null) _inspection.Bind(); };
-            delayedHost.Controls.Add(_delayed); delayedHost.Controls.Add(retry);
-            split.Controls.Add(_live, 0, 0); split.Controls.Add(delayedHost, 1, 0);
-            Controls.Add(split);
-            _layoutTimer.Tick += delegate { FitParent(); };
-            Shown += delegate { FitParent(); _layoutTimer.Start(); BeginInvoke(new Action(Connect)); };
-            ClientSizeChanged += delegate { QueueFrontendResize(); };
-        }
-
-        private void QueueFrontendResize()
-        {
-            if (!_frontendLoaded || _resizeQueued || !IsHandleCreated || IsDisposed || Disposing) return;
-            _resizeQueued = true;
-            BeginInvoke(new Action(delegate
+            Controls.Add(_delayed);
+            _layoutTimer.Tick += delegate
             {
-                _resizeQueued = false;
-                if (!_frontendLoaded || _frontend == null || _frontend.IsDisposed || IsDisposed) return;
-                try
+                FitParent();
+                if (IsDisposed || Disposing) return;
+                FolderImageSource source;
+                string error;
+                lock (_gate) { source = _source; error = _error; }
+                if (error != null) { _delayed.ShowStatus(error, false); return; }
+                if (source == null) return;
+                string status;
+                var result = source.Take(out status);
+                if (result != null) _delayed.ShowResult(result);
+                else if (status != null) _delayed.ShowStatus(status, false);
+            };
+            Shown += delegate
+            {
+                FitParent(); _layoutTimer.Start();
+                // This timer discovers files; delay is determined exclusively by file count.
+                _scanTimer = new System.Threading.Timer(Scan, null, 0, 200);
+            };
+        }
+        private void Scan(object unused)
+        {
+            if (Interlocked.Exchange(ref _busy, 1) != 0) return;
+            try
+            {
+                FolderImageSource source;
+                lock (_gate) { if (_closed) return; source = _source; }
+                if (source == null)
                 {
-                    // Dock/layout must finish before the SDK measures its WPF frontend.
-                    PerformLayout();
-                    _frontend.PerformLayout();
-                    _frontend.AutoChangeSize();
+                    source = new FolderImageSource(_settings.ImageFolder, _settings.DelayCount);
+                    lock (_gate)
+                    {
+                        if (_closed) { source.Dispose(); return; }
+                        _source = source;
+                    }
                 }
-                catch (Exception ex) { Trace.WriteLine(ex); }
-            }));
+                source.Scan();
+                lock (_gate) { _error = null; }
+            }
+            catch (Exception ex) { lock (_gate) { _error = "수신 폴더 확인 중: " + ex.Message; } }
+            finally { Interlocked.Exchange(ref _busy, 0); }
         }
         protected override CreateParams CreateParams
         {
@@ -105,86 +99,14 @@ namespace SC6000DelayedMonitor
             if (!IsWindow(_parent)) { Close(); return; }
             EmbeddedWindow.Fit(Handle, _parent, false);
         }
-        private void Connect()
-        {
-            string stage = "Remote 연결";
-            try
-            {
-                // Set REMOTE before constructing any VM controls, as in the SDK sample.
-                VmSolution.SetControlMode(ControlModeType.REMOTE);
-                _frontend = new VmFrontendControl { Dock = DockStyle.Fill, Visible = false };
-                _live.Controls.Add(_frontend);
-                VmSolution.GetSolutionInstanceToDevice(new DeviceModeInfo
-                {
-                    emDeviceMode = DeviceModeType.NET,
-                    strDevIP = _settings.Ip,
-                    nPort = VmRemotePort,
-                    strPassword = _settings.Password
-                });
-                _connected = true;
-                stage = "Operation Interface 로딩";
-                FitParent();
-                _frontend.LoadFrontendSource();
-                _frontendLoaded = true;
-                _frontend.Visible = true;
-                _frontend.BringToFront();
-                FitParent();
-                QueueFrontendResize();
-                _status.Visible = false;
-                _inspection = new InspectionSession(_settings, this, _delayed);
-                _inspection.Bind();
-            }
-            catch (Exception ex)
-            {
-                VmException vm = ex as VmException;
-                try { if (vm == null) vm = VmSolution.GetVmException(ex); } catch { }
-                string code = vm == null ? null : vm.errorCode.ToString("X8");
-                string message = ConnectionErrors.Describe(code, ex.Message);
-                string details = _settings.Title + "\r\nIP: " + _settings.Ip + ":" + VmRemotePort +
-                    "\r\n단계: " + stage + "\r\n\r\n" + message +
-                    (code == null ? "" : "\r\n\r\n오류 코드: 0x" + code);
-                _frontendLoaded = false;
-                if (_frontend != null) _frontend.Visible = false;
-                _status.Text = details;
-                _status.Visible = true;
-                _status.BringToFront();
-                Trace.WriteLine(ex);
-                MessageBox.Show(this, details, "ASPEC | 카메라 연결 안내", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        }
-
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
-            _layoutTimer.Stop();
-            _layoutTimer.Dispose();
-            if (_inspection != null) _inspection.Dispose();
-            if (_frontend != null) { _live.Controls.Remove(_frontend); _frontend.Dispose(); }
-            if (_connected)
-                try { VmSolution.Instance?.Dispose(); }
-                catch (Exception ex) { Trace.WriteLine(ex); }
+            lock (_gate) { _closed = true; if (_source != null) _source.Dispose(); }
+            if (_scanTimer != null) _scanTimer.Dispose();
+            _layoutTimer.Stop(); _layoutTimer.Dispose();
             base.OnFormClosed(e);
         }
-
         [DllImport("user32.dll")]
         private static extern bool IsWindow(IntPtr hwnd);
-    }
-
-    internal static class ConnectionErrors
-    {
-        public static string Describe(string code, string fallback)
-        {
-            switch (code)
-            {
-                case "E000070C":
-                    return "VisionMaster가 카메라에 접속 중이거나 원격 측 실행 충돌이 발생했습니다.\r\n" +
-                        "카메라에 접속한 VisionMaster를 종료한 후 이 프로그램을 다시 실행해 주세요.";
-                case "E0000111":
-                    return "카메라에 연결할 수 없습니다. 카메라가 감지되지 않거나 통신에 응답하지 않습니다.\r\n" +
-                        "카메라 전원, LAN 케이블, IP 주소 및 네트워크 연결 상태를 확인한 후 다시 실행해 주세요.";
-                default:
-                    return "연결 또는 화면 로딩 중 오류가 발생했습니다.\r\n" + fallback +
-                        "\r\n카메라 연결 상태와 설정을 확인해 주세요.";
-            }
-        }
     }
 }

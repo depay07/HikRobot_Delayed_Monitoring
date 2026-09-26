@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -39,18 +39,12 @@ class LayoutTests
         if(args.Length>1 && args[1]=="child")
         {
             object camera=Activator.CreateInstance(a.GetType("SC6000DelayedMonitor.CameraSettings"));
-            camera.GetType().GetProperty("Ip").SetValue(camera,"127.0.0.1",null);
-            camera.GetType().GetProperty("Title").SetValue(camera,"SDK CONTROL LAYOUT TEST",null);
+            camera.GetType().GetProperty("ImageFolder").SetValue(camera,"",null);
+            camera.GetType().GetProperty("Title").SetValue(camera,"FTP IMAGE LAYOUT TEST",null);
             using(var child=(Form)Activator.CreateInstance(viewerType,camera,new IntPtr(long.Parse(args[2]))))
             {
                 ClearShown(child);
-                // Create the real VM frontend (including its WPF/native children), but never connect to a device.
-                var core=Assembly.Load("VM.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=61600122bc9264b9");
-                var mode=core.GetType("VM.Core.VmSolution").GetMethod("SetControlMode");
-                mode.Invoke(null,new[]{Enum.Parse(mode.GetParameters()[0].ParameterType,"REMOTE")});
-                var field=viewerType.GetField("_frontend",Private);
-                var sdk=(Control)Activator.CreateInstance(field.FieldType);
-                field.SetValue(child,sdk); sdk.Dock=DockStyle.Fill; var content=(Panel)viewerType.GetField("_live",Private).GetValue(child); content.Controls.Add(sdk); sdk.BringToFront();
+                var content = child; var sdk = (Control)viewerType.GetField("_delayed",Private).GetValue(child);
                 child.Shown+=delegate { File.WriteAllText(args[3]+".tmp",child.Handle.ToInt64().ToString()+","+sdk.Handle.ToInt64()+","+content.Handle.ToInt64()); File.Move(args[3]+".tmp",args[3]); };
                 child.FormClosing+=delegate
                 {
@@ -100,7 +94,7 @@ class LayoutTests
                     {
                         DateTime deadline=DateTime.UtcNow.AddSeconds(20);
                         while(!File.Exists(ready)&&DateTime.UtcNow<deadline)Pump(50);
-                        Check(File.Exists(ready),"SDK child startup timed out: "+ready);
+                        Check(File.Exists(ready),"viewer child startup timed out: "+ready);
                         string[] parts=File.ReadAllText(ready).Split(','); handles.Add(new IntPtr(long.Parse(parts[0]))); sdkHandles.Add(new IntPtr(long.Parse(parts[1]))); contentHandles.Add(new IntPtr(long.Parse(parts[2])));
                     }
                     foreach(var size in new[]{new Size(800,600),new Size(1280,720),new Size(1920,1080),new Size(2560,1440),new Size(3840,2160)})
@@ -117,9 +111,9 @@ class LayoutTests
                             Check(actual.Left==0&&actual.Top==0&&actual.Right==area.Right&&actual.Bottom==area.Bottom,
                                 "Native bounds mismatch "+count+" cameras, "+size+", camera "+i+": "+actual.Right+"x"+actual.Bottom+" vs "+area.Right+"x"+area.Bottom);
                             Rect sdkRect; GetWindowRect(sdkHandles[i],out sdkRect); MapWindowPoints(IntPtr.Zero,contentHandles[i],ref sdkRect,2); GetClientRect(contentHandles[i],out area);
-                            Check(sdkRect.Left==0 && sdkRect.Top==24 && sdkRect.Right==area.Right && sdkRect.Bottom==area.Bottom,"SDK bounds " + sdkRect.Left + "," + sdkRect.Top + " " + sdkRect.Right + "x" + sdkRect.Bottom + " vs " + area.Right + "x" + area.Bottom);
+                            Check(sdkRect.Left==0 && sdkRect.Top==0 && sdkRect.Right==area.Right && sdkRect.Bottom==area.Bottom,"SDK bounds " + sdkRect.Left + "," + sdkRect.Top + " " + sdkRect.Right + "x" + sdkRect.Bottom + " vs " + area.Right + "x" + area.Bottom);
                         }
-                        Console.WriteLine("PASS "+count+" cameras "+size+": native SDK child windows match equal grid cells");
+                        Console.WriteLine("PASS "+count+" cameras "+size+": native image viewer child windows match equal grid cells");
                     }
                     // Simulate SDK/WinForms overwriting bounds; the host must restore them without a child timer.
                     SetWindowPos(handles[0],IntPtr.Zero,120,90,2300,1500,0x14);Pump(50);Fit(host);
@@ -128,7 +122,7 @@ class LayoutTests
                     SetWindowPos(host.Handle,IntPtr.Zero,0,0,1280,720,0x14);Pump(50);Fit(host);
                     using(var bitmap=new Bitmap(host.Width,host.Height)) {host.DrawToBitmap(bitmap,new Rectangle(Point.Empty,host.Size));bitmap.Save(Path.Combine(work,"responsive-"+count+".png"));}
                     host.Close();
-                    foreach(var ready in readyFiles)Check(File.Exists(ready+".closed"),"SDK child did not exit gracefully");
+                    foreach(var ready in readyFiles)Check(File.Exists(ready+".closed"),"viewer child did not exit gracefully");
                     Console.WriteLine("PASS "+count+" cameras: bounds drift correction, header, logo unlock, graceful process exit");
                 }
                 finally {if(!host.IsDisposed)host.Close();}

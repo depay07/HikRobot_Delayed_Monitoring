@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -6,8 +6,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-using VM.Core;
-using VM.PlatformSDKCS;
+
+
 
 namespace SC6000DelayedMonitor
 {
@@ -50,29 +50,15 @@ namespace SC6000DelayedMonitor
                     return;
                 }
 
-                // Each SC6000 is opened in a separate process because each process owns
-                // its own VmSolution.Instance singleton.
+                // Each camera keeps its own folder reader and delayed image queue.
+                // Viewer processes are embedded in the shared monitor window.
                 Application.Run(new MonitorForm(config, exePath, baseDir));
             }
             catch (Exception ex)
             {
-                VmException vmEx = ex as VmException;
-                if (vmEx != null)
-                {
-                    MessageBox.Show(
-                        "VisionMaster SDK error. Error Code: 0x" + vmEx.errorCode.ToString("X"),
-                        "SC6000 Monitor",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error);
-                }
-                else
-                {
-                    MessageBox.Show(ex.ToString(), "SC6000 Monitor",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+                MessageBox.Show(ex.Message, "SC6000 Delayed Monitor", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
         private static int ReadSlot(string[] args)
         {
             foreach (string a in args)
@@ -102,15 +88,11 @@ namespace SC6000DelayedMonitor
 
     internal sealed class CameraSettings
     {
-        public string Ip { get; set; }
-        public string Password { get; set; }
+
+
         public string Title { get; set; }
         public int DelayCount { get; set; }
-        public string ProcedureName { get; set; }
-        public string ImageOutput { get; set; }
-        public string ResultOutput { get; set; }
-        public int OkValue { get; set; }
-        public int NgValue { get; set; }
+        public string ImageFolder { get; set; }
         public int MonitorIndex { get; set; }
     }
 
@@ -200,25 +182,13 @@ namespace SC6000DelayedMonitor
         public CameraSettings GetCamera(int slot)
         {
             string section = "CAMERA" + slot;
-            string ip = Get(section + ".IP", null);
-            if (string.IsNullOrWhiteSpace(ip))
-                throw new InvalidOperationException(section + "의 IP가 config.ini에 설정되어 있지 않습니다.");
 
-            int ok, ng;
-            if (!int.TryParse(Get(section + ".OK_VALUE", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out ok) ||
-                !int.TryParse(Get(section + ".NG_VALUE", "0"), NumberStyles.Integer, CultureInfo.InvariantCulture, out ng))
-                throw new InvalidOperationException("OK_VALUE와 NG_VALUE는 정수로 지정해야 합니다.");
-            if (ok == ng) throw new InvalidOperationException("OK_VALUE와 NG_VALUE는 달라야 합니다.");
             return new CameraSettings
             {
-                Ip = ip.Trim(),
-                Password = Get(section + ".PASSWORD", string.Empty),
+
+
                 DelayCount = DelayCount,
-                ProcedureName = Get(section + ".PROCEDURE", string.Empty),
-                ImageOutput = Get(section + ".IMAGE_OUTPUT", string.Empty),
-                ResultOutput = Get(section + ".RESULT_OUTPUT", string.Empty),
-                OkValue = ok,
-                NgValue = ng,
+                ImageFolder = Get(section + ".IMAGE_FOLDER", Get("IMAGE_FOLDER", string.Empty)),
                 Title = Get(section + ".TITLE", "SC6000 Camera " + slot),
                 MonitorIndex = MonitorIndex
             };

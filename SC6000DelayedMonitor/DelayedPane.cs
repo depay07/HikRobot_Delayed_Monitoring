@@ -17,23 +17,23 @@ namespace SC6000DelayedMonitor
             Dock = DockStyle.Fill;
             BackColor = Color.FromArgb(45, 52, 56);
             ForeColor = Color.White;
-            _status = new Label { Dock = DockStyle.Top, Height = 105, Padding = new Padding(8), AutoEllipsis = true };
+            _status = new Label { Dock = DockStyle.Top, Height = 64, Padding = new Padding(8), AutoEllipsis = true };
             _picture = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black };
             Controls.Add(_picture); Controls.Add(_status);
-            ShowStatus("연결 대기 중", true);
+            ShowStatus("FTP 수신 이미지 대기 중", true);
         }
         public void ShowStatus(string message, bool clear)
         {
             if (clear) ReleaseImage();
             _status.ForeColor = Color.White;
-            _status.Text = _title + " | Delayed Monitor\r\nDelay : " + _delay + " inspections\r\n" + message;
+            _status.Text = _title + " | " + _delay + "회 지연\r\n" + message;
         }
         public void ShowResult(InspectionResult result)
         {
             ReleaseImage(); _shown = result; _picture.Image = result.Image;
-            _status.ForeColor = result.IsOK ? Color.LightGreen : Color.Salmon;
-            _status.Text = _title + " | Connected\r\nDelay : " + _delay + " inspections\r\nSequence : " + result.SequenceNo +
-                "\r\nResult : " + (result.IsOK ? "OK" : "NG");
+            _status.ForeColor = Color.White;
+            _status.Text = _title + " | " + _delay + "회 지연 | 표시 순번: " + result.SequenceNo +
+                "\r\n" + System.IO.Path.GetFileName(result.FilePath);
         }
         private void ReleaseImage()
         { _picture.Image = null; if (_shown != null) { _shown.Dispose(); _shown = null; } }

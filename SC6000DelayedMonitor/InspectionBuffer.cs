@@ -9,10 +9,10 @@ namespace SC6000DelayedMonitor
     {
         public long SequenceNo { get; private set; }
         public Bitmap Image { get; private set; }
-        public bool IsOK { get; private set; }
+        public string FilePath { get; private set; }
         public DateTime Timestamp { get; private set; }
-        public InspectionResult(long sequence, Bitmap image, bool ok)
-        { SequenceNo = sequence; Image = image; IsOK = ok; Timestamp = DateTime.Now; }
+        public InspectionResult(long sequence, Bitmap image, string filePath)
+        { SequenceNo = sequence; Image = image; FilePath = filePath; Timestamp = DateTime.Now; }
         public void Dispose() { if (Image != null) { Image.Dispose(); Image = null; } }
     }
 
