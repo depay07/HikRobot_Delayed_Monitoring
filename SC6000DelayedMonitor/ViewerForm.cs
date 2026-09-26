@@ -16,7 +16,9 @@ namespace SC6000DelayedMonitor
         private readonly IntPtr _parent;
         private readonly Timer _layoutTimer = new Timer { Interval = 200 };
         private VmFrontendControl _frontend;
-        private readonly SolutionPane _solutions;
+        private readonly Panel _live;
+        private readonly DelayedPane _delayed;
+        private InspectionSession _inspection;
         private readonly Label _status;
         private bool _frontendLoaded;
         private bool _connected;
@@ -36,20 +38,25 @@ namespace SC6000DelayedMonitor
             _status = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = Color.White, Font = new Font("Segoe UI", 12),
                 Text = settings.Title + "\r\n" + settings.Ip + "\r\n연결 중..." };
-            _solutions = new SolutionPane(new RemoteSolutionSession(settings.SolutionDirectory, settings.SolutionPassword), ReloadFrontend);
-            _solutions.Content.Controls.Add(_status);
-            Controls.Add(_solutions);
+            var split = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
+                Margin = Padding.Empty, Padding = Padding.Empty };
+            split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            split.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            _live = new Panel { Dock = DockStyle.Fill, Margin = new Padding(1) };
+            _live.Controls.Add(_status);
+            _live.Controls.Add(new Label { Dock = DockStyle.Top, Height = 24, ForeColor = Color.White, Text = "Operation Interface (Live)" });
+            var delayedHost = new Panel { Dock = DockStyle.Fill, Margin = new Padding(1) };
+            _delayed = new DelayedPane(settings.Title, settings.DelayCount);
+            var retry = new Button { Dock = DockStyle.Bottom, Height = 32, AutoSize = true, Text = "결과 다시 연결",
+                BackColor = SystemColors.Control, ForeColor = SystemColors.ControlText, UseVisualStyleBackColor = true };
+            retry.Click += delegate { if (_connected && _inspection != null) _inspection.Bind(); };
+            delayedHost.Controls.Add(_delayed); delayedHost.Controls.Add(retry);
+            split.Controls.Add(_live, 0, 0); split.Controls.Add(delayedHost, 1, 0);
+            Controls.Add(split);
             _layoutTimer.Tick += delegate { FitParent(); };
             Shown += delegate { FitParent(); _layoutTimer.Start(); BeginInvoke(new Action(Connect)); };
             ClientSizeChanged += delegate { QueueFrontendResize(); };
-        }
-
-        private void ReloadFrontend()
-        {
-            _frontendLoaded = false;
-            _frontend.LoadFrontendSource();
-            _frontendLoaded = true;
-            QueueFrontendResize();
         }
 
         private void QueueFrontendResize()
@@ -106,7 +113,7 @@ namespace SC6000DelayedMonitor
                 // Set REMOTE before constructing any VM controls, as in the SDK sample.
                 VmSolution.SetControlMode(ControlModeType.REMOTE);
                 _frontend = new VmFrontendControl { Dock = DockStyle.Fill, Visible = false };
-                _solutions.Content.Controls.Add(_frontend);
+                _live.Controls.Add(_frontend);
                 VmSolution.GetSolutionInstanceToDevice(new DeviceModeInfo
                 {
                     emDeviceMode = DeviceModeType.NET,
@@ -124,7 +131,8 @@ namespace SC6000DelayedMonitor
                 FitParent();
                 QueueFrontendResize();
                 _status.Visible = false;
-                _solutions.Connected();
+                _inspection = new InspectionSession(_settings, this, _delayed);
+                _inspection.Bind();
             }
             catch (Exception ex)
             {
@@ -149,7 +157,8 @@ namespace SC6000DelayedMonitor
         {
             _layoutTimer.Stop();
             _layoutTimer.Dispose();
-            if (_frontend != null) { _solutions.Content.Controls.Remove(_frontend); _frontend.Dispose(); }
+            if (_inspection != null) _inspection.Dispose();
+            if (_frontend != null) { _live.Controls.Remove(_frontend); _frontend.Dispose(); }
             if (_connected)
                 try { VmSolution.Instance?.Dispose(); }
                 catch (Exception ex) { Trace.WriteLine(ex); }

@@ -105,8 +105,12 @@ namespace SC6000DelayedMonitor
         public string Ip { get; set; }
         public string Password { get; set; }
         public string Title { get; set; }
-        public string SolutionDirectory { get; set; }
-        public string SolutionPassword { get; set; }
+        public int DelayCount { get; set; }
+        public string ProcedureName { get; set; }
+        public string ImageOutput { get; set; }
+        public string ResultOutput { get; set; }
+        public int OkValue { get; set; }
+        public int NgValue { get; set; }
         public int MonitorIndex { get; set; }
     }
 
@@ -115,6 +119,7 @@ namespace SC6000DelayedMonitor
         private readonly Dictionary<string, string> _values;
 
         public int CameraCount { get; private set; }
+        public int DelayCount { get; private set; }
         public string InspectionText { get; private set; }
         public int MonitorIndex { get; private set; }
 
@@ -124,12 +129,19 @@ namespace SC6000DelayedMonitor
 
             int cameras;
             if (!TryGetInt("CAMERAS", out cameras))
-                cameras = 2;
+                cameras = 1;
 
             if (cameras < 1 || cameras > 4)
                 throw new InvalidOperationException("CAMERAS 값은 1부터 4까지 사용할 수 있습니다.");
 
             CameraCount = cameras;
+            int delay;
+            if (!TryGetInt("DELAY_COUNT", out delay) || delay < 0)
+            {
+                delay = 0;
+                MonitorLog.Write("Invalid or missing DELAY_COUNT; using 0.");
+            }
+            DelayCount = delay;
             InspectionText = Get("INSPECTION_TEXT", string.Empty);
 
             int monitorIndex;
@@ -192,12 +204,21 @@ namespace SC6000DelayedMonitor
             if (string.IsNullOrWhiteSpace(ip))
                 throw new InvalidOperationException(section + "의 IP가 config.ini에 설정되어 있지 않습니다.");
 
+            int ok, ng;
+            if (!int.TryParse(Get(section + ".OK_VALUE", "1"), NumberStyles.Integer, CultureInfo.InvariantCulture, out ok) ||
+                !int.TryParse(Get(section + ".NG_VALUE", "0"), NumberStyles.Integer, CultureInfo.InvariantCulture, out ng))
+                throw new InvalidOperationException("OK_VALUE와 NG_VALUE는 정수로 지정해야 합니다.");
+            if (ok == ng) throw new InvalidOperationException("OK_VALUE와 NG_VALUE는 달라야 합니다.");
             return new CameraSettings
             {
                 Ip = ip.Trim(),
                 Password = Get(section + ".PASSWORD", string.Empty),
-                SolutionDirectory = Get(section + ".SOLUTION_DIRECTORY", string.Empty),
-                SolutionPassword = Get(section + ".SOLUTION_PASSWORD", string.Empty),
+                DelayCount = DelayCount,
+                ProcedureName = Get(section + ".PROCEDURE", string.Empty),
+                ImageOutput = Get(section + ".IMAGE_OUTPUT", string.Empty),
+                ResultOutput = Get(section + ".RESULT_OUTPUT", string.Empty),
+                OkValue = ok,
+                NgValue = ng,
                 Title = Get(section + ".TITLE", "SC6000 Camera " + slot),
                 MonitorIndex = MonitorIndex
             };

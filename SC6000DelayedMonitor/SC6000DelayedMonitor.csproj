@@ -14,6 +14,7 @@
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Deterministic>true</Deterministic>
+    <VisionMasterAssemblyDir Condition="'$(VisionMasterAssemblyDir)' == ''">C:\Program Files\VisionMaster4.4.50\Development\V4.x\ComControls\Assembly</VisionMasterAssemblyDir>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -41,19 +42,28 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
+    <Reference Include="VMControls.RenderInterface, Version=1.0.0.0, Culture=neutral, PublicKeyToken=4bcfc50547abbb24, processorArchitecture=MSIL">
+      <HintPath>$(VisionMasterAssemblyDir)\VMControls.RenderInterface.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="VM.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=61600122bc9264b9, processorArchitecture=MSIL">
+      <HintPath>$(VisionMasterAssemblyDir)\VM.Core.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="VM.PlatformSDKCS, Version=1.0.0.0, Culture=neutral, PublicKeyToken=c1484a72052ee3d4, processorArchitecture=MSIL">
+      <HintPath>$(VisionMasterAssemblyDir)\VM.PlatformSDKCS.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="VMControls.BaseInterface, Version=1.0.0.0, Culture=neutral, PublicKeyToken=14444b8df74b6e6a, processorArchitecture=MSIL">
+      <HintPath>$(VisionMasterAssemblyDir)\VMControls.BaseInterface.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="VMControls.Interface, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cb41614600cf774b, processorArchitecture=MSIL">
+      <HintPath>$(VisionMasterAssemblyDir)\VMControls.Interface.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="VMControls.Winform.Release, Version=1.0.0.0, Culture=neutral, PublicKeyToken=2efa940dfee4dc7e, processorArchitecture=MSIL">
+      <HintPath>$(VisionMasterAssemblyDir)\VMControls.Winform.Release.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
@@ -63,16 +73,22 @@
     <Compile Include="MonitorForm.cs" />
     <Compile Include="CameraLayout.cs" />
     <Compile Include="MonitorHeader.cs" />
-    <Compile Include="SolutionManagement.cs" />
-    <Compile Include="SolutionPane.cs" />
+    <Compile Include="InspectionBuffer.cs" />
+    <Compile Include="InspectionSession.cs" />
+    <Compile Include="DelayedPane.cs" />
+    <Compile Include="MonitorLog.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
     <None Include="aspec.ico" />
     <None Include="app.manifest" />
+    <None Include="config.example.ini" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="CreateLocalConfig" BeforeTargets="PrepareForBuild" Condition="!Exists('config.ini')">
+    <Copy SourceFiles="config.example.ini" DestinationFiles="config.ini" />
+  </Target>
   <ItemGroup>
     <None Include="config.ini">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

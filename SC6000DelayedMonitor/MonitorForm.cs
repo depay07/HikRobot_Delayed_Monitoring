@@ -24,7 +24,7 @@ namespace SC6000DelayedMonitor
             _exePath = exePath;
             _baseDir = baseDir;
             AutoScaleMode = AutoScaleMode.None;
-            Text = "ASPEC | SC6000 Operation Interface Monitor";
+            Text = "ASPEC | SC6000 Delayed Monitor";
             Icon = Icon.ExtractAssociatedIcon(exePath);
             StartPosition = FormStartPosition.Manual;
             var screens = Screen.AllScreens;
