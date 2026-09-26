@@ -2,7 +2,7 @@
 
 PC의 FTP 수신 폴더에 저장되는 이미지를 저장 시간순으로 읽고, 지정한 개수만큼 늦춰 표시합니다.
 저장 이미지에 들어 있는 그래픽과 OK/NG를 그대로 보여줍니다. PC에서 판정을 다시 만들지 않습니다.
-카메라 SDK 접속, Procedure 이름, 이미지/판정 출력 이름은 설정하지 않습니다.
+카메라 접속은 각 CAMERA 구역의 IP, PORT, PASSWORD로 설정합니다. PORT 기본값은 VisionMaster Remote용 5556이며 검사 명령용 TCP 포트와는 별개입니다. SOLUTION_PATH를 지정하면 접속 후 해당 파일을 자동 로딩합니다. IP를 비우면 FTP 이미지만 표시합니다. Procedure와 이미지/판정 출력 이름은 필요하지 않습니다.
 
 ## 설정
 
@@ -17,6 +17,11 @@ IMAGE_FOLDER=D:\vision
 
 [CAMERA1]
 TITLE=1번 카메라
+IP=
+PORT=5556
+PASSWORD=
+SOLUTION_PATH=
+SOLUTION_PASSWORD=
 ```
 
 - IMAGE_FOLDER는 PC의 FTP 수신 최상위 폴더입니다.
@@ -40,6 +45,11 @@ CAMERAS=2
 DELAY_COUNT=14
 [CAMERA1]
 TITLE=1번 카메라
+IP=
+PORT=5556
+PASSWORD=
+SOLUTION_PATH=
+SOLUTION_PASSWORD=
 IMAGE_FOLDER=D:\vision\camera1
 [CAMERA2]
 TITLE=2번 카메라
@@ -53,7 +63,7 @@ logo.*는 실행 폴더에 넣으면 다음 실행에 적용되며 INSPECTION_TE
 
 SC6000DelayedMonitor.sln을 Visual Studio 또는 MSBuild로 빌드합니다.
 .NET Framework 4.6.1을 사용합니다. 기존 VisionMaster 설치 DLL 참조는 기반 프로젝트에 유지되어 있지만
-FTP 이미지 표시 경로에서는 SDK를 호출하지 않습니다.
+이미지 표시는 FTP 폴더에서 처리하고, IP가 설정된 카메라는 SDK로 접속합니다. 자동 로딩은 카메라에서 실행되며 PC에서 검사 실행/중지 명령을 보내지 않습니다.
 실행파일: SC6000DelayedMonitor/bin/Release/SC6000DelayedMonitor.exe
 config.ini가 없으면 빌드 시 config.example.ini로 초기 설정을 생성합니다.
 

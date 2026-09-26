@@ -111,7 +111,7 @@ class LayoutTests
                             Check(actual.Left==0&&actual.Top==0&&actual.Right==area.Right&&actual.Bottom==area.Bottom,
                                 "Native bounds mismatch "+count+" cameras, "+size+", camera "+i+": "+actual.Right+"x"+actual.Bottom+" vs "+area.Right+"x"+area.Bottom);
                             Rect sdkRect; GetWindowRect(sdkHandles[i],out sdkRect); MapWindowPoints(IntPtr.Zero,contentHandles[i],ref sdkRect,2); GetClientRect(contentHandles[i],out area);
-                            Check(sdkRect.Left==0 && sdkRect.Top==0 && sdkRect.Right==area.Right && sdkRect.Bottom==area.Bottom,"SDK bounds " + sdkRect.Left + "," + sdkRect.Top + " " + sdkRect.Right + "x" + sdkRect.Bottom + " vs " + area.Right + "x" + area.Bottom);
+                            Check(sdkRect.Left==0 && sdkRect.Top==0 && sdkRect.Right==area.Right && sdkRect.Bottom==area.Bottom-28,"Image viewer bounds including connection status");
                         }
                         Console.WriteLine("PASS "+count+" cameras "+size+": native image viewer child windows match equal grid cells");
                     }

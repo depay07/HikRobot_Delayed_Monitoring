@@ -69,6 +69,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="CameraStartup.cs" />
     <Compile Include="ViewerForm.cs" />
     <Compile Include="MonitorForm.cs" />
     <Compile Include="CameraLayout.cs" />

@@ -88,8 +88,11 @@ namespace SC6000DelayedMonitor
 
     internal sealed class CameraSettings
     {
-
-
+        public string Ip { get; set; }
+        public ushort Port { get; set; }
+        public string Password { get; set; }
+        public string SolutionPath { get; set; }
+        public string SolutionPassword { get; set; }
         public string Title { get; set; }
         public int DelayCount { get; set; }
         public string ImageFolder { get; set; }
@@ -182,11 +185,17 @@ namespace SC6000DelayedMonitor
         public CameraSettings GetCamera(int slot)
         {
             string section = "CAMERA" + slot;
+            ushort port;
+            if (!ushort.TryParse(Get(section + ".PORT", "5556"), out port) || port == 0)
+                throw new InvalidOperationException(section + "의 PORT는 1~65535 사이 숫자로 입력하세요.");
 
             return new CameraSettings
             {
-
-
+                Ip = Get(section + ".IP", string.Empty).Trim(),
+                Port = port,
+                Password = Get(section + ".PASSWORD", string.Empty),
+                SolutionPath = Get(section + ".SOLUTION_PATH", string.Empty).Trim(),
+                SolutionPassword = Get(section + ".SOLUTION_PASSWORD", string.Empty),
                 DelayCount = DelayCount,
                 ImageFolder = Get(section + ".IMAGE_FOLDER", Get("IMAGE_FOLDER", string.Empty)),
                 Title = Get(section + ".TITLE", "SC6000 Camera " + slot),

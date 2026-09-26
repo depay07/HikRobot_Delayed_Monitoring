@@ -18,6 +18,8 @@ namespace SC6000DelayedMonitor
         private int _busy;
         private bool _closed;
         private string _error;
+        private readonly Label _connectionStatus;
+        private SdkCameraConnection _connection;
 
         public ViewerForm(CameraSettings settings, IntPtr parent)
         {
@@ -28,6 +30,9 @@ namespace SC6000DelayedMonitor
             BackColor = Color.FromArgb(45, 52, 56);
             _delayed = new DelayedPane(settings.Title, settings.DelayCount);
             Controls.Add(_delayed);
+            _connectionStatus = new Label { Dock = DockStyle.Bottom, Height = 28, ForeColor = Color.White,
+                AutoEllipsis = true, Text = "카메라 접속 준비 중" };
+            Controls.Add(_connectionStatus);
             _layoutTimer.Tick += delegate
             {
                 FitParent();
@@ -47,7 +52,24 @@ namespace SC6000DelayedMonitor
                 FitParent(); _layoutTimer.Start();
                 // This timer discovers files; delay is determined exclusively by file count.
                 _scanTimer = new System.Threading.Timer(Scan, null, 0, 200);
+                BeginInvoke(new Action(ConnectCamera));
             };
+        }
+        private void ConnectCamera()
+        {
+            if (IsDisposed || Disposing) return;
+            try
+            {
+                _connection = new SdkCameraConnection();
+                _connectionStatus.Text = CameraStartup.Start(_settings, _connection);
+            }
+            catch (Exception ex)
+            {
+                var vm = ex as VM.PlatformSDKCS.VmException;
+                _connectionStatus.Text = "카메라 접속/로딩 실패: " +
+                    (vm == null ? ex.Message : "VisionMaster 0x" + vm.errorCode.ToString("X8"));
+                MonitorLog.Write(_connectionStatus.Text);
+            }
         }
         private void Scan(object unused)
         {
@@ -104,6 +126,8 @@ namespace SC6000DelayedMonitor
             lock (_gate) { _closed = true; if (_source != null) _source.Dispose(); }
             if (_scanTimer != null) _scanTimer.Dispose();
             _layoutTimer.Stop(); _layoutTimer.Dispose();
+            if (_connection != null)
+                try { _connection.Dispose(); } catch (Exception ex) { MonitorLog.Write(ex.Message); }
             base.OnFormClosed(e);
         }
         [DllImport("user32.dll")]

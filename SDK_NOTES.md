@@ -6,7 +6,7 @@
 
 이전 SDK 결과 콜백 방식은 제거했습니다.
 InspectionSession.cs와 PROCEDURE, IMAGE_OUTPUT, RESULT_OUTPUT, OK_VALUE, NG_VALUE 설정은 사용하지 않습니다.
-기존 SDK 참조만 프로젝트에 남아 있으며 현재 표시 경로에서는 SDK 접속이나 검사 명령을 호출하지 않습니다.
+CameraStartup.cs에서 config의 IP/PORT/PASSWORD로 GetSolutionInstanceToDevice를 호출합니다. SOLUTION_PATH가 지정되면 공식 VmSolution.Load(path, password)로 자동 로딩합니다. 이미지 표시와 카메라 연결 상태를 분리하며 Run/Stop 명령은 호출하지 않습니다. 실제 카메라 접속 검증은 현장 설정 입력 후 필요합니다.
 
 FolderImageSource.cs: 하위 날짜 폴더 검색, 저장 시간 정렬, 수신 완료 확인, 이미지 복사 및 횟수 큐.
 InspectionBuffer.cs: 지연 이미지 소유권과 제한된 UI 갱신 대기 큐.

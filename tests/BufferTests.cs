@@ -5,6 +5,13 @@ using System.IO;
 using SC6000DelayedMonitor;
 internal static class BufferTests
 {
+    sealed class FakeConnection : ICameraConnection
+    {
+        public string Address, Password, Path, FilePassword;
+        public ushort Port;
+        public void Connect(string ip, ushort port, string password) { Address=ip; Port=port; Password=password; }
+        public void Load(string path, string password) { Check(Address!=null,"Load before connect"); Path=path; FilePassword=password; }
+    }
     static void Check(bool ok, string why) { if(!ok) throw new Exception(why); }
     static readonly DateTime Epoch = new DateTime(2026,9,26,0,0,0,DateTimeKind.Utc);
     static byte[] Bytes(int n)
@@ -83,6 +90,19 @@ internal static class BufferTests
             foreach(string invalid in new[]{"-1","bad","2147483648"})
             { File.WriteAllText(ini,"DELAY_COUNT="+invalid);Check(IniConfig.Load(ini).DelayCount==0,"Invalid delay fallback"); }
             Console.WriteLine("PASS folder-only config without camera IP or SDK output names");
+            File.WriteAllText(ini,"CAMERAS=1\n[CAMERA1]\nIP=192.0.2.8\nPORT=5566\nPASSWORD=test-only\nSOLUTION_PATH=/root/vmtempfiles/ftp/solution/test.solx\nSOLUTION_PASSWORD=file-test\n");
+            var configured=IniConfig.Load(ini).GetCamera(1); var connection=new FakeConnection();
+            CameraStartup.Start(configured,connection);
+            Check(connection.Address=="192.0.2.8" && connection.Port==5566 && connection.Password=="test-only","Config endpoint not passed to SDK adapter");
+            Check(connection.Path==configured.SolutionPath && connection.FilePassword=="file-test","Startup load settings lost");
+            var disabled=new FakeConnection(); CameraStartup.Start(new CameraSettings(),disabled); Check(disabled.Address==null,"Empty IP attempted connection");
+            foreach(string port in new[]{"0","65536","abc"})
+            {
+                File.WriteAllText(ini,"[CAMERA1]\nPORT="+port); bool rejected=false;
+                try { IniConfig.Load(ini).GetCamera(1); } catch(InvalidOperationException) { rejected=true; }
+                Check(rejected,"Invalid port accepted");
+            }
+            Console.WriteLine("PASS configurable IP/port/password, startup load order, empty IP, invalid port");
         }
         catch(Exception ex){Console.Error.WriteLine(ex);Environment.ExitCode=1;}
     }
