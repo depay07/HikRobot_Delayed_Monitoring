@@ -39,8 +39,8 @@ namespace SC6000DelayedMonitor
             {
                 using (var font = new Font("Segoe UI", Math.Max(8, Height * .38f), FontStyle.Bold, GraphicsUnit.Pixel))
                 {
-                    logoWidth = Math.Min((int)(Width * .35), TextRenderer.MeasureText("ASPEC", font).Width);
-                    TextRenderer.DrawText(e.Graphics, "ASPEC", font, new Rectangle(pad, 0, logoWidth, Height), color,
+                    logoWidth = Math.Min((int)(Width * .35), TextRenderer.MeasureText("ES PACK", font).Width);
+                    TextRenderer.DrawText(e.Graphics, "ES PACK", font, new Rectangle(pad, 0, logoWidth, Height), color,
                         TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.NoPrefix);
                 }
             }

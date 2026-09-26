@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 
-[assembly: AssemblyTitle("SC6000 Delayed Monitor")]
+[assembly: AssemblyTitle("ES PACK | 이물질 검사 프로그램")]
 [assembly: AssemblyDescription("SC6000 inspection-count delayed monitor using VisionMaster Remote SDK")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("ASPEC")]

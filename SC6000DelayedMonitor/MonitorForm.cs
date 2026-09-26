@@ -24,7 +24,7 @@ namespace SC6000DelayedMonitor
             _exePath = exePath;
             _baseDir = baseDir;
             AutoScaleMode = AutoScaleMode.None;
-            Text = "ASPEC | SC6000 Delayed Monitor";
+            Text = "ES PACK | 이물질 검사 프로그램";
             Icon = Icon.ExtractAssociatedIcon(exePath);
             StartPosition = FormStartPosition.Manual;
             var screens = Screen.AllScreens;
@@ -126,7 +126,7 @@ namespace SC6000DelayedMonitor
                 catch (Exception ex)
                 {
                     _viewers.Add(null);
-                    MessageBox.Show(this, "카메라 " + (i + 1) + " 화면을 시작하지 못했습니다.\r\n" + ex.Message, "ASPEC", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(this, "카메라 " + (i + 1) + " 화면을 시작하지 못했습니다.\r\n" + ex.Message, "ES PACK | 이물질 검사 프로그램", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
             _watch.Start();

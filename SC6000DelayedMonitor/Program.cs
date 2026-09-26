@@ -29,7 +29,7 @@ namespace SC6000DelayedMonitor
                 {
                     MessageBox.Show(
                         "config.ini 파일을 찾을 수 없습니다.\r\n\r\n" + iniPath,
-                        "SC6000 Monitor",
+                        "ES PACK | 이물질 검사 프로그램",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error);
                     return;
@@ -56,7 +56,7 @@ namespace SC6000DelayedMonitor
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "SC6000 Delayed Monitor", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(ex.Message, "ES PACK | 이물질 검사 프로그램", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
         private static int ReadSlot(string[] args)
