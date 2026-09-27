@@ -18,6 +18,7 @@ namespace SC6000DelayedMonitor
         private int _busy;
         private bool _closed;
         private string _error;
+        private long _trailVersion = -1;
         private readonly Label _connectionStatus;
         private SdkCameraConnection _connection;
 
@@ -43,7 +44,9 @@ namespace SC6000DelayedMonitor
                 if (error != null) { _delayed.ShowStatus(error, false); return; }
                 if (source == null) return;
                 string status;
-                var result = source.Take(out status);
+                System.Collections.Generic.List<InspectionPreview> previews;
+                var result = source.Take(out status, ref _trailVersion, out previews);
+                if (previews != null) _delayed.ShowTrail(previews);
                 if (result != null) _delayed.ShowResult(result);
                 else if (status != null) _delayed.ShowStatus(status, false);
             };

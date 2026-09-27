@@ -40,6 +40,7 @@ class LayoutTests
         {
             object camera=Activator.CreateInstance(a.GetType("SC6000DelayedMonitor.CameraSettings"));
             camera.GetType().GetProperty("ImageFolder").SetValue(camera,"",null);
+            camera.GetType().GetProperty("DelayCount").SetValue(camera,13,null);
             camera.GetType().GetProperty("Title").SetValue(camera,"FTP IMAGE LAYOUT TEST",null);
             using(var child=(Form)Activator.CreateInstance(viewerType,camera,new IntPtr(long.Parse(args[2]))))
             {

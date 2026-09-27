@@ -69,7 +69,10 @@ namespace SC6000DelayedMonitor
                     lock (_gate)
                     {
                         if (_disposed) { copy.Dispose(); return; }
-                        _buffer.Push(new InspectionResult(++_sequence, copy, file.FullName));
+                        var result = new InspectionResult(_sequence + 1, copy, file.FullName);
+                        try { _buffer.Push(result); }
+                        catch { result.Dispose(); throw; }
+                        ++_sequence;
                         _status = _sequence <= _buffer.Delay ? "새 이미지 대기 중: " + _buffer.Count + " / " + _buffer.Delay : null;
                     }
                     _seen.Add(file.FullName); _observed.Remove(file.FullName);
@@ -80,6 +83,20 @@ namespace SC6000DelayedMonitor
         private void Status(string text) { lock (_gate) { _status = text; } }
         public InspectionResult Take(out string status)
         { lock (_gate) { status = _status; return _disposed ? null : _buffer.Take(); } }
+        public InspectionResult Take(out string status, ref long version, out List<InspectionPreview> previews)
+        {
+            lock (_gate)
+            {
+                status = _status; previews = null;
+                if (_disposed) return null;
+                if (version != _buffer.Version)
+                {
+                    previews = _buffer.Snapshot();
+                    version = _buffer.Version;
+                }
+                return _buffer.Take();
+            }
+        }
         public void Dispose() { lock (_gate) { _disposed = true; _buffer.Dispose(); } }
     }
 }

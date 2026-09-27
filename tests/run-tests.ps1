@@ -7,8 +7,14 @@ New-Item -ItemType Directory -Path $out -Force | Out-Null
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 $msbuild = & $vswhere -latest -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
 if (!$msbuild) { throw 'Visual Studio MSBuild is required.' }
-& $msbuild (Join-Path $root 'SC6000DelayedMonitor.sln') /t:Build /p:Configuration=Release /v:minimal /nologo
-if ($LASTEXITCODE) { throw 'Build failed' }
+$runtimeConfig = Join-Path $project 'bin\Release\config.ini'
+$savedConfig = if (Test-Path -LiteralPath $runtimeConfig) { [IO.File]::ReadAllBytes($runtimeConfig) } else { $null }
+try {
+    & $msbuild (Join-Path $root 'SC6000DelayedMonitor.sln') /t:Build /p:Configuration=Release /v:minimal /nologo
+    if ($LASTEXITCODE) { throw 'Build failed' }
+} finally {
+    if ($null -ne $savedConfig) { [IO.File]::WriteAllBytes($runtimeConfig, $savedConfig) }
+}
 $csc = Join-Path (Split-Path $msbuild) 'Roslyn\csc.exe'
 $sdk = 'C:\Program Files\VisionMaster4.4.50\Development\V4.x\ComControls\Assembly'
 $refs = @('System.dll','System.Core.dll','System.Drawing.dll','System.Windows.Forms.dll')
@@ -17,6 +23,7 @@ $arguments = @('/nologo','/target:exe','/main:BufferTests',('/out:' + (Join-Path
 $arguments += $refs | ForEach-Object { '/r:' + $_ }
 $arguments += Get-ChildItem -LiteralPath $project -Filter '*.cs' | ForEach-Object FullName
 $arguments += Join-Path $PSScriptRoot 'BufferTests.cs'
+$arguments += Join-Path $PSScriptRoot 'QueueTests.cs'
 & $csc @arguments
 if ($LASTEXITCODE) { throw 'Test compilation failed' }
 Copy-Item -LiteralPath (Join-Path $project 'App.config') -Destination (Join-Path $out 'BufferTests.exe.config')

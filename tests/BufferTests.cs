@@ -28,6 +28,7 @@ internal static class BufferTests
         {
             string root=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"ftp-"+Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
+            QueueTests.Run(root);
             foreach(int delay in new[]{0,1,14})
             {
                 string dir=Path.Combine(root,"delay"+delay); Directory.CreateDirectory(dir);
