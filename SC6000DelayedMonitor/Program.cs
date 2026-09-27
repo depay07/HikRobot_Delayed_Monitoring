@@ -106,6 +106,7 @@ namespace SC6000DelayedMonitor
         public int CameraCount { get; private set; }
         public int DelayCount { get; private set; }
         public string InspectionText { get; private set; }
+        public bool AlwaysOnTop { get; private set; }
         public int MonitorIndex { get; private set; }
 
         private IniConfig(Dictionary<string, string> values)
@@ -128,6 +129,8 @@ namespace SC6000DelayedMonitor
             }
             DelayCount = delay;
             InspectionText = Get("INSPECTION_TEXT", string.Empty);
+            int alwaysOnTop;
+            AlwaysOnTop = TryGetInt("ALWAYS_ON_TOP", out alwaysOnTop) && alwaysOnTop == 1;
 
             int monitorIndex;
             if (!TryGetInt("MONITOR", out monitorIndex))

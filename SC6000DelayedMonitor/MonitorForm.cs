@@ -25,6 +25,7 @@ namespace SC6000DelayedMonitor
             _baseDir = baseDir;
             AutoScaleMode = AutoScaleMode.None;
             Text = "ES PACK | 이물질 검사 프로그램";
+            TopMost = config.AlwaysOnTop;
             Icon = Icon.ExtractAssociatedIcon(exePath);
             StartPosition = FormStartPosition.Manual;
             var screens = Screen.AllScreens;
