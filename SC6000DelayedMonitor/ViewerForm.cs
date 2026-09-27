@@ -11,6 +11,7 @@ namespace SC6000DelayedMonitor
         private readonly CameraSettings _settings;
         private readonly IntPtr _parent;
         private readonly System.Windows.Forms.Timer _layoutTimer = new System.Windows.Forms.Timer { Interval = 200 };
+        private readonly System.Windows.Forms.Timer _displayTimer = new System.Windows.Forms.Timer { Interval = 33 };
         private readonly DelayedPane _delayed;
         private readonly object _gate = new object();
         private FolderImageSource _source;
@@ -34,9 +35,9 @@ namespace SC6000DelayedMonitor
             _connectionStatus = new Label { Dock = DockStyle.Bottom, Height = 28, ForeColor = Color.White,
                 AutoEllipsis = true, Text = "카메라 접속 준비 중" };
             Controls.Add(_connectionStatus);
-            _layoutTimer.Tick += delegate
+            _layoutTimer.Tick += delegate { FitParent(); };
+            _displayTimer.Tick += delegate
             {
-                FitParent();
                 if (IsDisposed || Disposing) return;
                 FolderImageSource source;
                 string error;
@@ -52,9 +53,9 @@ namespace SC6000DelayedMonitor
             };
             Shown += delegate
             {
-                FitParent(); _layoutTimer.Start();
+                FitParent(); _layoutTimer.Start(); _displayTimer.Start();
                 // This timer discovers files; delay is determined exclusively by file count.
-                _scanTimer = new System.Threading.Timer(Scan, null, 0, 200);
+                _scanTimer = new System.Threading.Timer(Scan, null, 0, 25);
                 BeginInvoke(new Action(ConnectCamera));
             };
         }
@@ -129,6 +130,7 @@ namespace SC6000DelayedMonitor
             lock (_gate) { _closed = true; if (_source != null) _source.Dispose(); }
             if (_scanTimer != null) _scanTimer.Dispose();
             _layoutTimer.Stop(); _layoutTimer.Dispose();
+            _displayTimer.Stop(); _displayTimer.Dispose();
             if (_connection != null)
                 try { _connection.Dispose(); } catch (Exception ex) { MonitorLog.Write(ex.Message); }
             base.OnFormClosed(e);

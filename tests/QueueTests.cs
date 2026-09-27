@@ -88,7 +88,7 @@ internal static class QueueTests
             for (int i = 1; i <= 15; ++i)
             {
                 using (var item = Item(i, i <= 2)) item.Image.Save(Path.Combine(folder, item.FileName), System.Drawing.Imaging.ImageFormat.Png);
-                source.Scan(); source.Scan(); source.Scan();
+                source.Scan(true); source.Scan(true); source.Scan(true);
                 string status;
                 using (var arrived = source.Take(out status))
                     if (i >= 14) Check(arrived != null && arrived.Verdict == InspectionVerdict.NG && arrived.SequenceNo == i - 13, "Duplicate scan shifts NG sequence");

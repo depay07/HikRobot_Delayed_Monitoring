@@ -42,10 +42,10 @@ namespace SC6000DelayedMonitor
         public int Count { get { return _queue.Count; } }
         public InspectionBuffer(int delay)
         { if (delay < 0) throw new ArgumentOutOfRangeException("delay"); Delay = delay; }
-        public void Push(InspectionResult result)
+        public void Push(InspectionResult result, InspectionPreview preparedPreview = null)
         {
             // Keep only small thumbnails for the right-hand conveyor view.
-            _trail.Enqueue(InspectionPreview.Create(result));
+            _trail.Enqueue(preparedPreview ?? InspectionPreview.Create(result));
             while (_trail.Count > (long)Delay + 1) _trail.Dequeue().Dispose();
             ++Version;
             _queue.Enqueue(result);
