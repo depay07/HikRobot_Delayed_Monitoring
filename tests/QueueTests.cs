@@ -29,9 +29,15 @@ internal static class QueueTests
             using (var buffer = new InspectionBuffer(delay))
             {
                 var arrivals = new List<int>();
+                var filmSequences = new List<int>();
                 for (int n = 1; n <= 50; ++n)
                 {
                     buffer.Push(Item(n, ngAt.Contains(n)));
+                    if (delay > 0 && (filmSequences.Count > 0 || ngAt.Contains(n)))
+                    {
+                        filmSequences.Add(n);
+                        if (filmSequences.Count == delay) filmSequences.Clear();
+                    }
                     using (var arrival = buffer.Take())
                     {
                         if (n <= delay) Check(arrival == null, "Arrival before required movements");
@@ -44,9 +50,9 @@ internal static class QueueTests
                     var previews = buffer.Snapshot();
                     try
                     {
-                        Check(previews.Count == Math.Min(n, delay + 1), "Trail size");
+                        Check(previews.Count == filmSequences.Count, "NG film count/reset");
                         for (int i = 0; i < previews.Count; ++i)
-                            Check(previews[i].SequenceNo == n - i && previews[i].Moves == i, "Independent item position");
+                            Check(previews[i].SequenceNo == filmSequences[i] && previews[i].Moves == i + 1, "Film input order/one-based count");
                     }
                     finally { foreach (var preview in previews) preview.Dispose(); }
                 }
@@ -63,7 +69,7 @@ internal static class QueueTests
             pane.ShowTrail(buffer.Snapshot());
             pane.ShowStatus("표시 갱신", true); // Releasing the displayed first NG must not clear later NGs.
             var snapshot = buffer.Snapshot();
-            Check(snapshot.Any(p => p.Number == "101" && p.Verdict == InspectionVerdict.NG && p.Moves == 12), "Next NG lost when previous display released");
+            Check(snapshot.Count == 0, "Completed film not reset");
             foreach (var item in snapshot) item.Dispose();
             buffer.Push(Item(15, false, 114));
             using (var next = buffer.Take()) Check(next.Number == "101" && next.Verdict == InspectionVerdict.NG, "Next consecutive NG arrival lost");
@@ -75,7 +81,7 @@ internal static class QueueTests
             for (int i = 1; i <= 2000; ++i) { var item = Item(i, i % 2 == 0); originals.Add(item); buffer.Push(item); }
             Check(originals.Count(i => i.Image != null) == 14, "Original image memory accumulated");
             var snapshots = buffer.Snapshot();
-            Check(snapshots.Count == 14 && snapshots.All(p => p.Thumbnail.Width <= 160 && p.Thumbnail.Height <= 100), "Thumbnail bounds");
+            Check(snapshots.Count < 13 && snapshots.All(p => p.Thumbnail.Width <= 160 && p.Thumbnail.Height <= 100), "Thumbnail bounds");
             buffer.Dispose();
             Check(originals.All(i => i.Image == null), "Original bitmap leak on close");
             Check(snapshots.All(i => i.Thumbnail.GetPixel(0, 0).A > 0), "UI snapshot borrows disposed image");
@@ -102,6 +108,7 @@ internal static class QueueTests
         using (var pane = new DelayedPane("CAMERA 1", 13))
         {
             for (int i = 1; i <= 14; ++i) buffer.Push(Item(i, i <= 3));
+            for (int i = 15; i <= 22; ++i) buffer.Push(Item(i, i == 15));
             pane.Size = new Size(1440, 800); pane.CreateControl(); pane.PerformLayout();
             pane.ShowResult(buffer.Take()); pane.ShowTrail(buffer.Snapshot());
             var flags = BindingFlags.NonPublic | BindingFlags.Instance;
@@ -112,5 +119,29 @@ internal static class QueueTests
             { pane.DrawToBitmap(bitmap, pane.ClientRectangle); bitmap.Save(Path.Combine(directory, "queue-preview.png")); }
         }
         Console.WriteLine("PASS right-side preview layout and render");
+        foreach (int count in new[] { 0, 1, 2, 12, 13, 14, 15 })
+        using (var buffer = new InspectionBuffer(count))
+        {
+            int sequence=0;
+            for(int i=0;i<20;i++) buffer.Push(Item(++sequence,false));
+            CheckFilm(buffer,0);
+            // Repeated complete batches; an NG in the middle must not restart the count.
+            for(int cycle=0;cycle<3;cycle++)
+            {
+                for(int i=1;i<=Math.Max(1,count);i++)
+                {
+                    buffer.Push(Item(++sequence,i==1 || i==2));
+                    CheckFilm(buffer,count==0 || i==count ? 0 : i);
+                }
+                for(int i=0;i<4;i++) { buffer.Push(Item(++sequence,false)); CheckFilm(buffer,0); }
+            }
+        }
+        Console.WriteLine("PASS NG-only film trigger, NG included as 1, exact count reset, OK idle, consecutive NG, retrigger, counts 0/1/2/12/13/14/15");
+    }
+    private static void CheckFilm(InspectionBuffer buffer,int expected)
+    {
+        var items=buffer.Snapshot();
+        try { Check(items.Count==expected,"Film lifecycle expected="+expected+", actual="+items.Count); }
+        finally { foreach(var item in items) item.Dispose(); }
     }
 }

@@ -25,31 +25,30 @@ namespace SC6000DelayedMonitor
         {
             base.OnPaint(e);
             const int header = 30, gap = 4;
-            TextRenderer.DrawText(e.Graphics, "제품 이동 현황 · 새 검사 → 제거 위치", Font,
+            TextRenderer.DrawText(e.Graphics, "NG 감지 필름 · " + _items.Count + "/" + _delay + (_items.Count == 0 ? " · NG 대기" : " · 수집 중"), Font,
                 new Rectangle(4, 0, Math.Max(1, Width - 8), header), ForeColor,
                 TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
-            // 13 moves = 14 positions (0..13), arranged in two columns and seven rows.
-            int rows = (int)Math.Max(1, ((long)_delay + 2) / 2);
+            // Exactly DELAY_COUNT slots, numbered 1..DELAY_COUNT.
+            int rows = (int)Math.Max(1, ((long)_delay + 1) / 2);
             float cellHeight = (Height - header) / (float)rows;
             if (Width < 20 || cellHeight < 8) return;
-            for (int index = 0; index <= (long)_delay && index < (long)rows * 2; ++index)
+            for (int index = 0; index < (long)_delay && index < (long)rows * 2; ++index)
             {
                 int row = index / 2, col = index % 2;
                 var box = new Rectangle(col * Width / 2 + gap, header + (int)(row * cellHeight) + gap,
                     Math.Max(1, Width / 2 - 2 * gap), Math.Max(1, (int)cellHeight - 2 * gap));
                 var item = index < _items.Count ? _items[index] : null;
-                bool arrived = item != null && item.Moves == _delay;
                 Color border = item == null ? Color.DimGray : item.Verdict == InspectionVerdict.NG ? Color.Red : Color.SeaGreen;
                 if (item != null && item.Verdict == InspectionVerdict.Unknown) border = Color.Gray;
-                using (var pen = new Pen(arrived ? Color.Gold : border, arrived ? 3 : 2))
+                using (var pen = new Pen(border, 2))
                     e.Graphics.DrawRectangle(pen, box);
                 string state = item == null ? "대기" : item.Verdict == InspectionVerdict.Unknown ? "판정 미확인" : item.Verdict.ToString();
-                string caption = item == null ? "이동 " + index + "/" + _delay :
-                    state + " #" + item.Number + (arrived ? " · 도착" : " · " + item.Moves + "/" + _delay);
+                string caption = item == null ? "대기 " + (index + 1) + "/" + _delay :
+                    state + " #" + item.Number + " · " + item.Moves + "/" + _delay;
                 int textHeight = Math.Min(22, box.Height);
                 TextRenderer.DrawText(e.Graphics, caption, Font,
                     new Rectangle(box.X + 3, box.Y + 1, Math.Max(1, box.Width - 6), textHeight),
-                    item != null && item.Verdict == InspectionVerdict.NG ? Color.Salmon : arrived ? Color.Gold : ForeColor,
+                    item != null && item.Verdict == InspectionVerdict.NG ? Color.Salmon : ForeColor,
                     TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
                 if (item == null || box.Height <= textHeight + 4) continue;
                 var area = new Rectangle(box.X + 3, box.Y + textHeight + 1, Math.Max(1, box.Width - 6), box.Height - textHeight - 4);

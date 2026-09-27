@@ -44,10 +44,16 @@ namespace SC6000DelayedMonitor
         { if (delay < 0) throw new ArgumentOutOfRangeException("delay"); Delay = delay; }
         public void Push(InspectionResult result, InspectionPreview preparedPreview = null)
         {
-            // Keep only small thumbnails for the right-hand conveyor view.
-            _trail.Enqueue(preparedPreview ?? InspectionPreview.Create(result));
-            while (_trail.Count > (long)Delay + 1) _trail.Dequeue().Dispose();
-            ++Version;
+            // The film is a separate NG-triggered batch. Its reset never resets the delay FIFO.
+            if (Delay > 0 && (_trail.Count > 0 || result.Verdict == InspectionVerdict.NG))
+            {
+                _trail.Enqueue(preparedPreview ?? InspectionPreview.Create(result));
+                // The triggering NG is image 1; reaching the configured count completes the batch.
+                if (_trail.Count == Delay)
+                    while (_trail.Count > 0) _trail.Dequeue().Dispose();
+                ++Version;
+            }
+            else if (preparedPreview != null) preparedPreview.Dispose();
             _queue.Enqueue(result);
             if (_queue.Count <= Delay) return;
             if (_pending != null) _pending.Dispose();
@@ -61,8 +67,8 @@ namespace SC6000DelayedMonitor
             var snapshots = new List<InspectionPreview>();
             try
             {
-                for (int i = items.Length - 1; i >= 0; --i)
-                    snapshots.Add(items[i].Copy(items.Length - 1 - i));
+                for (int i = 0; i < items.Length; ++i)
+                    snapshots.Add(items[i].Copy(i + 1));
                 return snapshots;
             }
             catch { foreach (var item in snapshots) item.Dispose(); throw; }

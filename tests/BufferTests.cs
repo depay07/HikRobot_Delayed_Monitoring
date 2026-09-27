@@ -153,7 +153,7 @@ internal static class BufferTests
             Check(last==87,"Watcher burst lost or duplicated an inspection / wrong delay");
             string status; long version=-1; System.Collections.Generic.List<InspectionPreview> previews;
             using(var pending=source.Take(out status,ref version,out previews)) { }
-            Check(previews.Count==14 && previews[0].SequenceNo==100 && previews[13].SequenceNo==87,"Burst queue positions");
+            Check(previews.Count==8 && previews[0].SequenceNo==93 && previews[7].SequenceNo==100,"Burst NG film cycle");
             foreach(var preview in previews) preview.Dispose();
             Console.WriteLine("PASS actual watcher: 100-file burst, all inspections counted, 13 subsequent inputs, bounded trail ({0} ms)",clock.ElapsedMilliseconds);
         }
